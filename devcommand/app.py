@@ -14,7 +14,8 @@ from fastapi.responses import FileResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from . import creative, platforms
+from . import creative, platforms, relay
+from .setup import local_checks
 from .store import ACCOUNTS, C, MASTER, MEDIA, db, initialize, masters, rows, run, save_setting, setting, source_path
 from .worker import clip_hash
 
@@ -68,6 +69,11 @@ def cut_fields(data):
     return start, duration, crop
 
 
+@app.get("/health")
+def health():
+    return {"app": "DEV Command"}
+
+
 @app.get("/")
 def home(request: Request, view: str = "campaigns", release: str = "", error: str = ""):
     catalog = rows("SELECT * FROM releases ORDER BY published DESC")
@@ -83,10 +89,15 @@ def home(request: Request, view: str = "campaigns", release: str = "", error: st
     grouped = {}
     for comment in inbox:
         grouped.setdefault(comment["title"], []).append(comment)
+    paused = setting("media_paused") == "1"
+    worker = time.time() - int(setting("worker_seen", "0")) < 120
+    briefing = relay.brief(worker, bool(C.get("youtube_channel")), paused, len(catalog),
+                           sum(post["state"] == "draft" for post in posts),
+                           sum(comment["state"] in {"new", "draft"} for comment in inbox))
     return templates.TemplateResponse(request, "index.html", dict(
         view=view, catalog=catalog, selected=selected, clips=clips, posts=posts, inbox=inbox, grouped=grouped,
         files=files, suggested=suggested, folder=MASTER, error=error, accounts={p:C.get(k,"") for p,k in ACCOUNTS.items()},
-        paused=setting("media_paused") == "1", worker=time.time() - int(setting("worker_seen", "0")) < 120,
+        paused=paused, worker=worker, briefing=briefing, checks=local_checks() if view == "settings" else [],
         health=rows("SELECT substr(key,8) AS name,value FROM settings WHERE key LIKE 'health:%'"),
         now=int(time.time()), tz=str(TZ), analytics=json.loads(setting("analytics", "{}")),
         leads=rows("SELECT * FROM leads ORDER BY id DESC"), suggestion=json.loads(setting("cut:" + selected["id"], "{}")) if selected else {}))

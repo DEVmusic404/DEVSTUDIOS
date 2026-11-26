@@ -11,9 +11,10 @@ from fastapi.testclient import TestClient
 temp = tempfile.TemporaryDirectory()
 os.environ["DEV_COMMAND_DATA"] = temp.name
 
-from devcommand import media, platforms, store, worker
+from devcommand import media, platforms, relay, setup, store, worker
 from devcommand.app import app, TZ
 from datetime import datetime
+from pathlib import Path
 
 
 class CampaignTests(unittest.TestCase):
@@ -32,6 +33,13 @@ class CampaignTests(unittest.TestCase):
     def submit(self, action, **params):
         return self.client.post("/action", headers=self.headers, follow_redirects=False,
                                 data={"release": self.release, "action": action, **params})
+
+    def test_dashboard_and_setup_render_with_local_assets(self):
+        self.assertEqual(self.client.get("/health").json(), {"app": "DEV Command"})
+        dashboard = self.client.get("/")
+        self.assertIn("The booth is open", dashboard.text)
+        self.assertEqual(self.client.get("/static/relay-booth.webp").status_code, 200)
+        self.assertIn("FFmpeg and FFprobe", self.client.get("/?view=settings").text)
 
     def get_post(self):
         return store.rows("SELECT * FROM posts")[0]
@@ -111,6 +119,25 @@ class CampaignTests(unittest.TestCase):
         self.assertEqual(result["receipt"], "reel")
         self.assertEqual(result["state"], "published")
 
+    def test_release_import_uses_official_public_videos(self):
+        snippet = {"channelId": "studio", "title": "Public DEV Studios release",
+                   "description": "", "publishedAt": "2026-11-25", "liveBroadcastContent": "none"}
+        responses = [
+            {"items": [{"contentDetails": {"relatedPlaylists": {"uploads": "uploads"}}}]},
+            {"items": [{"contentDetails": {"videoId": key}} for key in ["public", "private", "upcoming"]]},
+            {"items": [
+                {"id": "public", "snippet": snippet, "status": {"privacyStatus": "public"}},
+                {"id": "private", "snippet": snippet, "status": {"privacyStatus": "private"}},
+                {"id": "upcoming", "snippet": {**snippet, "liveBroadcastContent": "upcoming"},
+                 "status": {"privacyStatus": "public"}},
+            ]},
+        ]
+        with patch.dict(store.C, {"youtube_channel": "studio"}), \
+             patch.object(platforms, "account_token", return_value="token"), \
+             patch.object(platforms, "request", side_effect=responses):
+            platforms.releases()
+        self.assertEqual({item["id"] for item in store.rows("SELECT id FROM releases")}, {self.release, "public"})
+
     def test_import_and_reply_from_inbox(self):
         with patch.dict(store.C, {"youtube_channel": "studio"}), \
              patch.object(platforms, "account_token", return_value="token"), \
@@ -144,6 +171,25 @@ class CampaignTests(unittest.TestCase):
             f"caption_{tiktok['id']}": "Watch this", f"due_{tiktok['id']}": "2026-11-25T20:00"})
         self.assertEqual(self.client.get(f"/export/{tiktok['id']}/caption.txt").text, "Watch this")
         self.assertEqual(self.client.get(f"/export/{tiktok['id']}/clip.mp4").status_code, 200)
+
+
+class SetupTests(unittest.TestCase):
+    def test_settings_round_trip_and_existing_values(self):
+        import tomllib
+
+        with tempfile.TemporaryDirectory() as directory:
+            config = Path(directory) / "config.toml"
+            with patch.object(setup, "CONFIG", config), patch.object(setup, "C", {"youtube_channel": "studio"}):
+                setup.update_config(master_folder=r"C:\DEV Studios\Ready to Promote")
+                values = tomllib.loads(config.read_text(encoding="utf-8"))
+            self.assertEqual(values["youtube_channel"], "studio")
+            self.assertEqual(values["master_folder"], r"C:\DEV Studios\Ready to Promote")
+            self.assertEqual(list(config.parent.iterdir()), [config])
+
+    def test_relay_brief_prioritizes_available_action(self):
+        self.assertEqual(relay.brief(False, True, False, 2, 1, 0)[2], "settings")
+        self.assertIn("3 posts", relay.brief(True, True, False, 2, 3, 1)[1])
+        self.assertEqual(relay.brief(True, True, False, 2, 0, 1)[2], "inbox")
 
 
 if __name__ == "__main__":

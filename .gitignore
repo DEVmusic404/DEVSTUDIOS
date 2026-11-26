@@ -6,3 +6,5 @@ config.toml
 data/
 *.sqlite*
 client_secret*.json
+
+/generated_images/

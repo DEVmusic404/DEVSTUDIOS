@@ -12,6 +12,20 @@
 <main>
 {% if error %}<p class="alert" role="alert">{{ error }}</p>{% endif %}
 {% if view=='campaigns' %}
+<section class="relay-hero" aria-labelledby="relay-heading">
+<div class="relay-copy">
+<div class="relay-name"><img src="/static/relay-avatar.webp" width="44" height="44" alt=""> <div>Relay <span>Studio producer</span></div></div>
+<h2 id="relay-heading">{{ briefing[0] }}</h2><p>{{ briefing[1] }}</p>
+{% if briefing[2]=='settings' %}<a class="button" href="/?view=settings">Open studio setup</a>
+{% elif briefing[2]=='inbox' %}<a class="button" href="/?view=inbox">Review inbox</a>
+{% endif %}
+</div>
+<div class="relay-console" aria-label="Studio workload">
+<div><strong>{{ catalog|length }}</strong><span>Releases</span></div>
+<div><strong>{{ posts|selectattr('state','equalto','draft')|list|length }}</strong><span>Draft posts</span></div>
+<div><strong>{{ inbox|selectattr('state','in',['new','draft'])|list|length }}</strong><span>Comments to review</span></div>
+</div>
+</section>
 <div class="title"><div><h1>Campaigns</h1><p>Turn a DEV Studios release into clips and scheduled posts.</p></div>
 <form method="post" action="/action">{% call action('sync') %}Sync uploads{% endcall %}</form></div>
 <div class="layout">
@@ -82,7 +96,16 @@
 {% for post in posts if post.state=='published' and post.due>=now-604800 %}<article class="post"><strong>{{ post.hook or post.title }}</strong><p>{{ post.platform|capitalize }} · {% if post.link %}<a href="{{ post.link }}">View post</a>{% endif %}</p><p>{{ post.metrics or 'Waiting for engagement data' }}</p></article>{% else %}<p>No published posts in this period.</p>{% endfor %}</section>
 {% else %}
 <div class="title"><div><h1>Connections</h1><p>Manage local processing and check platform access.</p></div></div>
-<section class="panel"><h2>Platform accounts</h2>{% for platform, account in accounts.items() %}<div class="row post"><strong>{{ platform|capitalize }}</strong><span>{{ account or 'Unconfigured' }}</span></div>{% endfor %}
+<section class="panel"><h2>Studio setup</h2>
+<div class="setup-steps">
+<article><h3>Run Windows setup</h3><p>Open PowerShell in DEVSTUDIOS and run <code>.\scripts\setup-windows.ps1</code> to install dependencies, create your master folder, and start the dashboard.</p></article>
+<article><h3>Connect studio accounts</h3><p>Use a Google Desktop OAuth JSON file for YouTube and a Page token for Facebook and linked Instagram. Setup prompts for credentials on your machine.</p></article>
+<article><h3>Verify and sync</h3><p>Start the worker at sign-in, check the connections below, then sync your uploads. TikTok exports are available from an approved clip.</p></article>
+</div>
+{% for name, ready, detail in checks %}<div class="setup-check"><strong>{{ name }}</strong><span class="pill {{ 'ready' if ready else '' }}">{{ 'Ready' if ready else 'Check setup' }}</span><p>{{ detail }}</p></div>{% endfor %}
+<p><a href="https://github.com/DEVmusic404/DEVSTUDIOS#connect-accounts" target="_blank" rel="noopener">Account and permission guide ↗</a></p>
+</section>
+<section class="panel spaced"><h2>Platform accounts</h2>{% for platform, account in accounts.items() %}<div class="row post"><strong>{{ platform|capitalize }}</strong><span>{{ account or 'Unconfigured' }}</span></div>{% endfor %}
 {% for item in health %}<p>{{ item.name }} · {{ item.value }}</p>{% endfor %}
 <p>Update account IDs in the local config and use the Windows connection commands documented in the README. Restart both processes after editing config.</p>
 <div class="actions"><form method="post" action="/action">{% call action('sync') %}Check connections{% endcall %}</form><form method="post" action="/action">{% call action('backfill') %}Import older uploads{% endcall %}</form></div></section>

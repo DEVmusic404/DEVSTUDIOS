@@ -94,12 +94,17 @@ def releases(backfill=False):
     params = {"part": "snippet,contentDetails", "playlistId": playlist, "maxResults": 50}
     while True:
         result = request("GET", f"{YT}/playlistItems", token, params=params)
+        ids = [item["contentDetails"]["videoId"] for item in result.get("items", [])]
+        batch = request("GET", f"{YT}/videos", token, params={"part": "snippet,status", "id": ",".join(ids)}) if ids else {}
         with db() as conn:
-            for item in result.get("items", []):
-                snippet, details = item["snippet"], item["contentDetails"]
-                if details.get("videoPublishedAt") and snippet.get("videoOwnerChannelId") == channel:
-                    conn.execute("INSERT INTO releases VALUES (?,?,?,?) ON CONFLICT(id) DO UPDATE SET title=excluded.title,description=excluded.description,published=excluded.published",
-                                 (details["videoId"], snippet["title"], snippet["description"], details["videoPublishedAt"]))
+            for video in batch.get("items", []):
+                snippet = video["snippet"]
+                if (video["status"].get("privacyStatus") == "public" and snippet["channelId"] == channel
+                        and snippet.get("liveBroadcastContent", "none") == "none"):
+                    conn.execute(
+                        "INSERT INTO releases VALUES (?,?,?,?) ON CONFLICT(id) DO UPDATE SET "
+                        "title=excluded.title,description=excluded.description,published=excluded.published",
+                        (video["id"], snippet["title"], snippet["description"], snippet["publishedAt"]))
         if not backfill or not result.get("nextPageToken"):
             return
         params["pageToken"] = result["nextPageToken"]

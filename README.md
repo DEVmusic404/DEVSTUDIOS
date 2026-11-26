@@ -6,25 +6,23 @@ DEV Command is a local Windows workspace for promoting official DEV Studios rele
 
 Install Python 3.11 or 3.12 and put FFmpeg and FFprobe on your user PATH. Use a build with libx264 and the subtitles filter. Install and start Ollama if you want AI drafts. Pull a local model and put its exact name in the config. Whisper runs on CPU by default, with an optional CUDA setting if your CTranslate2 CUDA/cuDNN runtime is installed. The first transcription downloads the selected Whisper model.
 
-Run these from PowerShell in your checkout:
+Run this from PowerShell in the checkout:
 
 ```powershell
-py -3.12 -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r requirements-media.txt
-$DevCommandSettings = Join-Path $env:LOCALAPPDATA "DEV Command"
-New-Item -ItemType Directory -Force $DevCommandSettings
-Copy-Item config.example.toml (Join-Path $DevCommandSettings "config.toml")
+.\scripts\setup-windows.ps1
 ```
 
-Edit that config. The default master folder is `Videos\DEV Studios\Ready to Promote` under your user profile. Use the YouTube ID or exact video title as the master’s filename stem for preselection. You can always choose a master manually. The same local Windows account can run the dashboard and worker.
+The script installs Python packages into `.venv`, configures your master folder and Ollama model, walks through account connections, and opens the dashboard. Use `-SkipAccounts` to explore the dashboard before connecting any accounts. Use `-NoLaunch` to configure without starting processes. Setup keeps existing settings when you press Enter.
+
+The default master folder is `Videos\DEV Studios\Ready to Promote` under your user profile. Use the YouTube ID or exact video title as the master filename stem for preselection. You can also choose a master manually. The setup screen lists local dependencies and account checks. Manual settings live at `%LOCALAPPDATA%\DEV Command\config.toml`, with defaults documented in `config.example.toml`.
 
 ### Connect accounts
 
-- **YouTube** — Enable YouTube Data API v3 and YouTube Analytics API in your Google Cloud project. Create a Desktop OAuth client, grant access to the studio owner, enter the studio channel ID in the config, and run `.\.venv\Scripts\python.exe -m devcommand.connect youtube C:\path\client_secret.json`. Choose the DEV Studios channel in consent. Google OAuth apps left in external testing can require periodic reconnection. The app imports YouTube metadata and replies to audience comments.
-- **Meta** — Use a Facebook Login Meta app and a Page access token for the DEV Studios Page. Link the professional Instagram account to the Page. Enter the Page ID, linked Instagram professional account ID, and a Graph API version enabled for the app. Grant the applicable Page permissions including `pages_show_list`, `pages_read_engagement`, `pages_manage_posts`, `pages_manage_engagement`, and `pages_read_user_content`, and Instagram permissions including `instagram_basic`, `instagram_content_publish`, `instagram_manage_comments`, and `instagram_manage_insights`. Access requirements depend on your app and role. Run `.\.venv\Scripts\python.exe -m devcommand.connect meta` and paste the Page token at the hidden prompt. Re-run the command to replace expired or revoked credentials.
+- **YouTube** — Enable YouTube Data API v3 and YouTube Analytics API in your Google Cloud project. Create a Desktop OAuth client, grant access to the studio owner, run `.\.venv\Scripts\python.exe -m devcommand.connect youtube C:\path\client_secret.json`. Choose the DEV Studios channel in consent and confirm the channel shown in setup. Google OAuth apps left in external testing can require periodic reconnection. The app imports YouTube metadata and replies to audience comments.
+- **Meta** — Use a Facebook Login Meta app and a Page access token for the DEV Studios Page. Link the professional Instagram account to the Page. Select the Graph API version enabled for your app. Setup displays the Page and linked Instagram IDs for confirmation. Grant the applicable Page permissions including `pages_show_list`, `pages_read_engagement`, `pages_manage_posts`, `pages_manage_engagement`, and `pages_read_user_content`, and Instagram permissions including `instagram_basic`, `instagram_content_publish`, `instagram_manage_comments`, and `instagram_manage_insights`. Access requirements depend on your app and role. Run `.\.venv\Scripts\python.exe -m devcommand.connect meta` and paste the Page token at the hidden prompt. Re-run the command to replace expired or revoked credentials.
 - **TikTok** — Approve the export, download the clip and caption, and upload in TikTok.
 
-Google OAuth credentials and the Meta token live in the OS credential vault. Keep OAuth JSON outside the checkout. Restart both processes after changing account IDs or config. Post destinations are checked against live account identity before submission.
+Google OAuth credentials and the Meta token live in the OS credential vault. Keep OAuth JSON outside the checkout. Restart both processes after changing account IDs or config. Run `.\scripts\restart-studio.ps1` to reload the dashboard and scheduled worker. Post destinations are checked against live account identity before submission.
 
 ### Run
 
@@ -36,6 +34,8 @@ Google OAuth credentials and the Meta token live in the OS credential vault. Kee
 You can also run `.\.venv\Scripts\python.exe -m devcommand.worker` from a second console. The scheduled task starts at your Windows sign-in so it can access that user’s credential vault. It continues when the dashboard closes. The app runs on loopback at http://127.0.0.1:8765. Resolve any connection messages on the Connections tab before approving a campaign.
 
 ## Studio workflow
+
+Relay is the dashboard’s studio producer. The briefing uses real queue and inbox counts to point you to the next action. Ollama drafts use Relay’s dry, practical voice internally. Public copy is written for the release and audience, with separate cues for DEVPOOL, Tethered, and DEV 404.
 
 1. Sync uploads or choose **Import older uploads** on Connections. Select a release and choose the original master. Suggest a cut or enter the timestamps and horizontal crop manually. Queue a preview and refresh the release to check rendering.
 2. Play the captioned result. To revise a cut or crop, render a new preview. Draft destinations from the desired preview. With no master use **Draft Facebook link**. Configure Ollama for custom copy and timing, or edit the built-in captions and defaults.

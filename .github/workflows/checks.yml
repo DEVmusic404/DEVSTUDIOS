@@ -1,0 +1,25 @@
+name: DEV Command checks
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install app dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Check PowerShell syntax
+        shell: powershell
+        run: |
+          Get-ChildItem scripts -Filter *.ps1 | ForEach-Object {
+            $tokens = $null
+            $errors = $null
+            $null = [System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$tokens, [ref]$errors)
+            if ($errors) { throw ($errors -join [Environment]::NewLine) }
+          }
+      - name: Run integration tests
+        run: python -m unittest discover -s tests -v

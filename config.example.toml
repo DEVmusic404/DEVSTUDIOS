@@ -1,0 +1,14 @@
+timezone = "America/Chicago"
+youtube_channel = ""
+facebook_page = ""
+instagram_account = ""
+# Set to a currently supported version enabled for your Meta app.
+graph_version = "v25.0"
+ollama_model = ""
+whisper_model = "small"
+whisper_device = "cpu"
+poll_seconds = 300
+stale_hours = 12
+# master_folder = "C:/Users/you/Videos/DEV Studios/Ready to Promote"
+# Optional HTTPS landing page you operate. Facebook link posts receive UTM tags.
+# campaign_landing_url = "https://www.dev-404.com/watch/{video_id}"

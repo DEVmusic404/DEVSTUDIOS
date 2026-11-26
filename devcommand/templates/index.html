@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DEV Command · DEV Studios</title><link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+{% macro action(name, id='') %}<input type="hidden" name="view" value="{{ view }}"><input type="hidden" name="release" value="{{ selected.id if selected else '' }}"><input type="hidden" name="id" value="{{ id }}"><button name="action" value="{{ name }}"> {{ caller() }} </button>{% endmacro %}
+<header><a class="brand" href="/"><span class="brand-mark">D<span></span></span><span>DEV COMMAND<small>DEV STUDIOS</small></span></a>
+<nav aria-label="Workspace">{% for key,label in [('campaigns','Campaigns'),('inbox','Inbox'),('results','Results'),('settings','Connections')] %}<a href="/?view={{ key }}" {% if view==key %}aria-current="page"{% endif %}>{{ label }}</a>{% endfor %}</nav>
+<div class="worker"><i class="{{ 'on' if worker else '' }}"></i>{{ 'Worker online' if worker else 'Worker offline' }}</div></header>
+<main>
+{% if error %}<p class="alert" role="alert">{{ error }}</p>{% endif %}
+{% if view=='campaigns' %}
+<div class="title"><div><h1>Campaigns</h1><p>Turn a DEV Studios release into clips and scheduled posts.</p></div>
+<form method="post" action="/action">{% call action('sync') %}Sync uploads{% endcall %}</form></div>
+<div class="layout">
+<aside class="panel catalog"><h2>Release library</h2>
+{% for item in catalog %}<a class="{{ 'selected' if selected and item.id==selected.id else '' }}" href="/?release={{ item.id }}"><strong>{{ item.title }}</strong><small>{{ item.published[:10] }}</small></a>
+{% else %}<p>Connect YouTube and sync to bring in your releases.</p><a href="/?view=settings">Open connections →</a>{% endfor %}</aside>
+<div class="stack">
+{% if selected %}
+<section class="panel"><div class="row"><div><h2>{{ selected.title }}</h2><p>{{ selected.published[:10] }}</p></div><a class="button" href="https://www.youtube.com/watch?v={{ selected.id }}" target="_blank" rel="noopener">Watch on YouTube ↗</a></div></section>
+<section class="panel"><h2>Clip workshop</h2><p class="path">{{ folder }}</p>
+<form method="post" action="/action" class="stack">
+<input type="hidden" name="release" value="{{ selected.id }}">
+<label>Master footage<select name="source" required><option value="">Choose a local video</option>{% for file in files %}<option {% if file==suggestion.source or (not suggestion.source and suggested|length==1 and file==suggested[0]) %}selected{% endif %}>{{ file }}</option>{% endfor %}</select></label>
+<div class="fields"><label>Start (seconds)<input type="number" step="0.1" min="0" name="start" value="{{ suggestion.start|default(0) }}" required></label><label>Length (seconds)<input type="number" step="0.1" min="5" max="60" name="duration" value="{{ suggestion.duration|default(25) }}" required></label><label>Horizontal crop (0–1)<input type="number" step="0.01" min="0" max="1" name="crop" value="0.5" required></label></div>
+<label>Hook<input name="hook" maxlength="300" value="{{ suggestion.hook|default('') }}" placeholder="The line or moment that opens the clip"></label>
+{% if suggestion.status %}<p>{{ suggestion.status }} <a href="/?release={{ selected.id }}">Refresh</a></p>{% endif %}
+<div class="actions"><button class="primary" name="action" value="render" {% if not files %}disabled{% endif %}>Queue preview</button><button name="action" value="suggest" {% if not files %}disabled{% endif %}>Suggest a cut</button></div></form>
+{% if clips %}<div class="clips">{% for clip in clips %}<article class="clip">
+{% if clip.state=='ready' %}<video controls preload="metadata" src="/clips/{{ clip.id }}/clip.mp4"></video>{% endif %}
+<div><strong>{{ clip.hook or clip.source }}</strong><p>{{ clip.start }}s start · {{ clip.duration }}s cut · {{ clip.state }}</p>
+{% if clip.error %}<p class="alert">{{ clip.error }}</p>{% endif %}
+{% if clip.state=='ready' %}<form method="post" action="/action">{% call action('drafts',clip.id) %}Draft campaign for this clip{% endcall %}</form>{% endif %}</div>
+</article>{% endfor %}</div>{% endif %}</section>
+<section class="panel"><div class="row"><div><h2>Publish plan</h2><p>Review each destination and publish time in {{ tz }}.</p></div><form method="post" action="/action">{% call action('drafts') %}Draft Facebook link{% endcall %}</form></div>
+<form method="post" action="/action" class="stack">
+<input type="hidden" name="release" value="{{ selected.id }}">
+{% for post in posts if post.release==selected.id and post.state in ['draft','failed','approved'] and not post.stage %}
+<article class="post">
+<div class="row"><label class="check"><input name="posts" type="checkbox" value="{{ post.id }}" {% if post.state!='approved' %}checked{% endif %}><strong>{{ post.platform|capitalize }} {{ post.kind }}</strong></label><span class="pill">{{ post.state }}</span></div>
+<p>Account {{ accounts[post.platform] or 'Unconfigured' if post.platform!='tiktok' else post.account }}{% if post.hook %} · {{ post.hook }}{% endif %}{% if post.clip %} · <a href="/clips/{{ post.clip }}/clip.mp4" target="_blank" rel="noopener">Preview clip ↗</a>{% endif %}</p>
+{% if post.target_url %}<p><a href="{{ post.target_url }}" target="_blank" rel="noopener">Open link destination ↗</a></p>{% endif %}
+{% if post.error %}<p class="alert">{{ post.error }}</p>{% endif %}
+<label>Caption<textarea name="caption_{{ post.id }}" rows="2" maxlength="2000">{{ post.caption }}</textarea></label>
+<label>Publish time<input name="due_{{ post.id }}" type="datetime-local" value="{{ post.due|localtime }}"></label>
+</article>
+{% else %}<p>No editable posts for this release.</p>{% endfor %}
+{% if posts|selectattr('release','equalto',selected.id)|list %}<div class="actions"><button class="primary" name="action" value="approve_posts">Approve selected</button><button name="action" value="save_posts">Save as drafts</button></div>{% endif %}</form>
+{% for post in posts if post.release==selected.id and (post.state not in ['draft','failed','approved'] or post.stage) %}
+<article class="post"><div class="row"><strong>{{ post.platform|capitalize }} {{ post.kind }}</strong><span class="pill">{{ post.state|replace('_',' ') }}</span></div>
+<p>{{ post.account }} · {{ post.due|localtime|replace('T',' ') }} · Job {{ post.id[:8] }}</p><p>{{ post.caption }}</p>
+{% if post.link %}<a href="{{ post.link }}" target="_blank" rel="noopener">Open published post ↗</a>{% endif %}
+{% if post.receipt %}<p>Platform ID {{ post.receipt }}</p>{% endif %}
+{% if post.error %}<p class="alert">{{ post.error }}</p>{% endif %}
+{% if post.state=='export_ready' %}<div class="actions"><a class="button" href="/export/{{ post.id }}/clip.mp4">Download clip</a><a class="button" href="/export/{{ post.id }}/caption.txt">Download caption</a></div>{% endif %}
+{% if post.state=='verify' %}<form method="post" action="/action" class="stack"><label>Confirmed platform post ID<input name="receipt" required></label><label>Published URL<input name="link" type="url"></label>{% call action('receipt',post.id) %}Record publication{% endcall %}</form>{% endif %}
+{% if post.state in ['verify','failed'] %}<form method="post" action="/action">{% call action('rearm',post.id) %}Return to draft after confirming it did not publish{% endcall %}</form>{% endif %}
+</article>{% endfor %}</section>
+{% else %}<section class="panel empty"><span class="empty-mark">▶</span><h2>Your release queue will appear here</h2><p>Sync your official YouTube channel to start a campaign. Add the original export to your master folder to cut a clip.</p><a class="button primary" href="/?view=settings">Set up connections</a></section>{% endif %}
+</div></div>
+{% elif view=='inbox' %}
+<div class="title"><div><h1>Inbox</h1><p>Audience comments and approved replies, grouped by release.</p></div><form method="post" action="/action">{% call action('sync') %}Sync comments{% endcall %}</form></div>
+<div class="stack">{% for title, comments in grouped.items() %}<section class="panel"><h2>{{ title }}</h2>
+{% for item in comments %}<article class="post"><div class="row"><strong>{{ item.author }} · {{ item.platform|capitalize }}</strong><span class="pill">{{ item.state }}</span></div><p>{{ item.body }}</p>
+{% if item.error %}<p class="alert">{{ item.error }}</p>{% endif %}
+{% if item.receipt %}<p>Reply ID {{ item.receipt }}</p>{% endif %}
+{% if item.state in ['new','draft'] %}<form method="post" action="/action" class="stack"><input type="hidden" name="platform" value="{{ item.platform }}"><label>Studio reply<textarea name="reply" rows="2" maxlength="1000">{{ item.reply }}</textarea></label><div class="actions">{% call action('reply_draft',item.remote) %}Suggest reply{% endcall %}{% call action('reply_save',item.remote) %}Save draft{% endcall %}{% call action('reply_approve',item.remote) %}Approve reply{% endcall %}</div></form>
+{% else %}<p>{{ item.reply }}</p>{% endif %}
+{% if item.state=='verify' %}<form method="post" action="/action"><input type="hidden" name="platform" value="{{ item.platform }}"><label>Confirmed reply ID<input name="receipt" required></label>{% call action('reply_record',item.remote) %}Record sent reply{% endcall %}</form>{% endif %}
+</article>{% endfor %}</section>{% else %}<section class="panel empty"><h2>No comments yet</h2><p>Comments from your synced releases and published Meta posts appear here.</p></section>{% endfor %}</div>
+<section class="panel spaced"><h2>Collaboration shortlist</h2><form method="post" action="/action" class="stack"><div class="fields"><label>Creator or conversation<input name="title" required></label><label>URL<input name="url" type="url" required></label></div><label>Reply or outreach draft<textarea name="draft" rows="2"></textarea></label><div>{% call action('add_lead') %}Save lead{% endcall %}</div></form>
+{% for lead in leads %}<article class="post"><a href="{{ lead.url }}" target="_blank" rel="noopener">{{ lead.title }}</a><p>{{ lead.draft }}</p></article>{% endfor %}</section>
+{% elif view=='results' %}
+<div class="title"><div><h1>Results</h1><p>Compare recent campaign hooks and track channel trends.</p></div></div>
+<section class="panel"><h2>YouTube · last seven report dates</h2>
+{% if analytics %}<p>{{ analytics.start }} through {{ analytics.end }} · YouTube reporting can lag.</p><div class="stats"><div><strong>{{ analytics.external_views if analytics.external_views is not none else '—' }}</strong><span>External views</span></div><div><strong>{{ analytics.subscribers[0] if analytics.subscribers else '—' }}</strong><span>Subscribers gained</span></div><div><strong>{{ analytics.subscribers[1] if analytics.subscribers else '—' }}</strong><span>Subscribers lost</span></div></div>
+{% else %}<p>Channel analytics will appear after an authorized sync.</p>{% endif %}</section>
+<section class="panel spaced"><h2>Recent published campaigns</h2><p>Provider engagement totals for posts scheduled in the last seven days.</p>
+{% for post in posts if post.state=='published' and post.due>=now-604800 %}<article class="post"><strong>{{ post.hook or post.title }}</strong><p>{{ post.platform|capitalize }} · {% if post.link %}<a href="{{ post.link }}">View post</a>{% endif %}</p><p>{{ post.metrics or 'Waiting for engagement data' }}</p></article>{% else %}<p>No published posts in this period.</p>{% endfor %}</section>
+{% else %}
+<div class="title"><div><h1>Connections</h1><p>Manage local processing and check platform access.</p></div></div>
+<section class="panel"><h2>Platform accounts</h2>{% for platform, account in accounts.items() %}<div class="row post"><strong>{{ platform|capitalize }}</strong><span>{{ account or 'Unconfigured' }}</span></div>{% endfor %}
+{% for item in health %}<p>{{ item.name }} · {{ item.value }}</p>{% endfor %}
+<p>Update account IDs in the local config and use the Windows connection commands documented in the README. Restart both processes after editing config.</p>
+<div class="actions"><form method="post" action="/action">{% call action('sync') %}Check connections{% endcall %}</form><form method="post" action="/action">{% call action('backfill') %}Import older uploads{% endcall %}</form></div></section>
+<section class="panel spaced"><h2>Media worker</h2><p>{{ 'Paused. The current job can finish.' if paused else 'Active. Clips and cut suggestions run one at a time.' }}</p><form method="post" action="/action">{% call action('pause') %}{{ 'Resume media jobs' if paused else 'Pause media jobs' }}{% endcall %}</form></section>
+{% endif %}
+</main></body></html>

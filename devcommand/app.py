@@ -91,7 +91,7 @@ def home(request: Request, view: str = "campaigns", release: str = "", error: st
         grouped.setdefault(comment["title"], []).append(comment)
     paused = setting("media_paused") == "1"
     worker = time.time() - int(setting("worker_seen", "0")) < 120
-    briefing = relay.brief(worker, bool(C.get("youtube_channel")), paused, len(catalog),
+    briefing = relay.brief(worker, setting("health:YouTube releases") == "Connected", paused, len(catalog),
                            sum(post["state"] == "draft" for post in posts),
                            sum(comment["state"] in {"new", "draft"} for comment in inbox))
     return templates.TemplateResponse(request, "index.html", dict(

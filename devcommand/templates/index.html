@@ -105,7 +105,7 @@
 {% for name, ready, detail in checks %}<div class="setup-check"><strong>{{ name }}</strong><span class="pill {{ 'ready' if ready else '' }}">{{ 'Ready' if ready else 'Check setup' }}</span><p>{{ detail }}</p></div>{% endfor %}
 <p><a href="https://github.com/DEVmusic404/DEVSTUDIOS#connect-accounts" target="_blank" rel="noopener">Account and permission guide ↗</a></p>
 </section>
-<section class="panel spaced"><h2>Platform accounts</h2>{% for platform, account in accounts.items() %}<div class="row post"><strong>{{ platform|capitalize }}</strong><span>{{ account or 'Unconfigured' }}</span></div>{% endfor %}
+<section class="panel spaced"><h2>Platform accounts</h2>{% for platform, account in accounts.items() %}<div class="row post"><strong>{{ platform|capitalize }}</strong><span>{% if platform=='youtube' and account %}<a href="https://www.youtube.com/channel/{{ account|urlencode }}" target="_blank" rel="noopener">{{ account }} ↗</a>{% else %}{{ account or 'Unconfigured' }}{% endif %}</span></div>{% endfor %}
 {% for item in health %}<p>{{ item.name }} · {{ item.value }}</p>{% endfor %}
 <p>Update account IDs in the local config and use the Windows connection commands documented in the README. Restart both processes after editing config.</p>
 <div class="actions"><form method="post" action="/action">{% call action('sync') %}Check connections{% endcall %}</form><form method="post" action="/action">{% call action('backfill') %}Import older uploads{% endcall %}</form></div></section>

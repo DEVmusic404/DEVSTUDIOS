@@ -9,7 +9,12 @@ ROOT.mkdir(parents=True, exist_ok=True)
 MEDIA = ROOT / "media"
 MEDIA.mkdir(exist_ok=True)
 CONFIG = ROOT / "config.toml"
-C = tomllib.loads(CONFIG.read_text(encoding="utf-8")) if CONFIG.exists() else {}
+DEV_STUDIOS_CHANNEL = "UCiyfEB0RNIGCa03hhoA9otQ"
+C = {"youtube_channel": DEV_STUDIOS_CHANNEL}
+if CONFIG.exists():
+    C.update(tomllib.loads(CONFIG.read_text(encoding="utf-8")))
+if not C["youtube_channel"]:
+    C["youtube_channel"] = DEV_STUDIOS_CHANNEL
 MASTER = Path(C.get("master_folder", Path.home() / "Videos/DEV Studios/Ready to Promote")).expanduser().resolve()
 ACCOUNTS = {"facebook": "facebook_page", "instagram": "instagram_account", "youtube": "youtube_channel"}
 SCHEMA = """
